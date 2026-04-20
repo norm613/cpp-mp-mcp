@@ -63,9 +63,11 @@ Pass sandbox credentials explicitly — they override anything in `.env.local`:
 claude mcp add mp-sandbox --scope user `
   --env MINISTRY_PLATFORM_BASE_URL=https://mpsandbox.archomaha.org/ministryplatformapi `
   --env MINISTRY_PLATFORM_CLIENT_ID=MPNext `
-  --env MINISTRY_PLATFORM_CLIENT_SECRET=YOUR_SANDBOX_SECRET `
+  --env MINISTRY_PLATFORM_CLIENT_SECRET="YOUR_SANDBOX_SECRET" `
   -- cmd /c npx tsx "$env:USERPROFILE\code\cpp-mp-mcp\src\index.ts"
 ```
+
+> ⚠️ **Wrap the secret in double quotes.** MP client secrets contain special characters (`?`, `*`, `^`, `&`, `@`) that PowerShell interprets as operators or variables. Unquoted, PowerShell may silently transform or drop part of the secret, and MP will reject the auth request with a confusing 400/401. The same applies to secrets in `.env.local` files.
 
 Substitute `YOUR_SANDBOX_SECRET` with your actual sandbox client secret (ask your MP admin if you don't have it). The base URL and client ID can also be overridden from prod if your sandbox uses different values.
 
