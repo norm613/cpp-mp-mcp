@@ -27,8 +27,8 @@ This server enforces that all Claude-driven MP access flows through MPHelper's v
 ## Quick Start
 
 ```powershell
-# 1. Make sure MPNext is at %USERPROFILE%\code\MPNext and has .env.local set up.
-#    If not, clone and configure it first per MPNext's own docs.
+# 1. Make sure MPNext is at %USERPROFILE%\code\MPNext with .env.local configured
+#    for PRODUCTION (your MP tenant's prod URL, client ID, and client secret).
 
 # 2. Clone and install this server
 mkdir $env:USERPROFILE\code -Force
@@ -37,7 +37,7 @@ git clone https://github.com/norm613/cpp-mp-mcp.git
 cd cpp-mp-mcp
 npm install
 
-# 3. Register with Claude Code at user scope (run from PowerShell, not Git Bash)
+# 3. Register for PRODUCTION (uses MPNext's .env.local as-is)
 claude mcp add mp --scope user -- cmd /c npx tsx "$env:USERPROFILE\code\cpp-mp-mcp\src\index.ts"
 
 # 4. Verify
@@ -47,23 +47,68 @@ claude mcp list
 
 Then relaunch Claude Code. Ask it "look up Contact 4173 in Ministry Platform" to confirm.
 
+## Managing Both Production and Sandbox
+
+MP has separate prod and sandbox tenants. This server supports ONE tenant per process (MPHelper is a singleton internally), so to connect to both, **register the MCP twice in Claude Code** with different env vars per registration. They show up in Claude as two distinct tools, and you pick which one for each query.
+
+### Production registration
+Uses credentials from MPNext's `.env.local`:
+```powershell
+claude mcp add mp --scope user -- cmd /c npx tsx "$env:USERPROFILE\code\cpp-mp-mcp\src\index.ts"
+```
+
+### Sandbox registration
+Pass sandbox credentials explicitly — they override anything in `.env.local`:
+```powershell
+claude mcp add mp-sandbox --scope user `
+  --env MINISTRY_PLATFORM_BASE_URL=https://mpsandbox.archomaha.org/ministryplatformapi `
+  --env MINISTRY_PLATFORM_CLIENT_ID=MPNext `
+  --env MINISTRY_PLATFORM_CLIENT_SECRET=YOUR_SANDBOX_SECRET `
+  -- cmd /c npx tsx "$env:USERPROFILE\code\cpp-mp-mcp\src\index.ts"
+```
+
+Substitute `YOUR_SANDBOX_SECRET` with your actual sandbox client secret (ask your MP admin if you don't have it). The base URL and client ID can also be overridden from prod if your sandbox uses different values.
+
+### After both are registered
+`claude mcp list` will show:
+```
+mp           ✓ Connected   (production tenant)
+mp-sandbox   ✓ Connected   (sandbox tenant)
+```
+
+In Claude Code sessions, tools appear with distinct prefixes — `mcp__mp__*` for production and `mcp__mp_sandbox__*` for sandbox. When asking Claude to do something, be explicit about which tenant: *"look this up in MP sandbox"* vs *"look this up in MP production."*
+
+**Rule of thumb:** test writes in sandbox first, promote to production only after review. See the safety section below.
+
 ---
 
 ## Configuration
 
-### Credentials come from MPNext
+### Environment variables (what MPHelper reads)
 
-By default this server reads MP credentials from `%USERPROFILE%\code\MPNext\.env.local`. That's deliberate — keeping creds in one place (the MPNext install) means you configure them once, and both the MPNext CLI scripts and this MCP server use the same values.
+The MCP passes these through to MPHelper:
 
-If you keep MPNext elsewhere, override via the `MPNEXT_PATH` env var in the `claude mcp add` command:
+| Variable | Purpose |
+|----------|---------|
+| `MINISTRY_PLATFORM_BASE_URL` | MP REST API base URL (e.g., `https://mp.archomaha.org/ministryplatformapi`) |
+| `MINISTRY_PLATFORM_CLIENT_ID` | OAuth client ID (e.g., `MPNext`) |
+| `MINISTRY_PLATFORM_CLIENT_SECRET` | OAuth client secret |
+
+**Resolution order** (first wins):
+1. `--env` flags passed to `claude mcp add`
+2. Variables already in your shell environment
+3. A local `.env` in this repo
+4. `.env.local` in your MPNext install
+
+For the default prod registration, source 4 (MPNext's `.env.local`) provides everything. For sandbox, source 1 (`--env` flags) overrides only what's different.
+
+### Custom MPNext path
+
+If MPNext lives somewhere other than `%USERPROFILE%\code\MPNext`, pass `MPNEXT_PATH`:
 
 ```powershell
 claude mcp add mp --scope user --env MPNEXT_PATH=D:\path\to\MPNext -- cmd /c npx tsx "$env:USERPROFILE\code\cpp-mp-mcp\src\index.ts"
 ```
-
-### Local `.env` override
-
-You can also drop a `.env` in this repo's root to override specific vars for this MCP only (e.g., point at the MP sandbox during testing). Values in local `.env` override values loaded from MPNext's `.env.local`.
 
 ---
 
