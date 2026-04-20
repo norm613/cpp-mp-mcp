@@ -1,0 +1,22 @@
+{
+  "name": "cpp-mp-mcp",
+  "version": "0.1.0",
+  "description": "MCP server exposing Ministry Platform REST API to Claude Code via MPHelper from the local MPNext install",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "dotenv": "^16.4.5",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
