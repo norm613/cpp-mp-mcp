@@ -12,7 +12,8 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as path from "path";
-import { pathToFileURL } from "url";
+import { pathToFileURL, fileURLToPath } from "url";
+import { createRequire } from "module";
 import * as dotenv from "dotenv";
 
 // --- Locate MPNext ---
@@ -25,6 +26,34 @@ const mpnextPath =
 const mpnextEnvPath = path.join(mpnextPath, ".env.local");
 dotenv.config({ path: mpnextEnvPath });
 dotenv.config(); // local .env overrides nothing already set
+
+// --- Make MPNext's provider importable outside Next.js ---
+// Since 2026-09-29 (MPNext 606dc53) the MP client and services start with
+// `import "server-only"`. That package only resolves inside a Next.js app;
+// in this standalone Node process it is a missing module, which crashed the
+// server at startup ("Connection closed" in Claude Code). We are server-side
+// by definition, so redirect the import to an empty stub before MPHelper loads.
+const serverOnlyStub = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "stubs",
+  "server-only.cjs"
+);
+{
+  const Module = createRequire(import.meta.url)("module") as {
+    _resolveFilename: (request: string, ...rest: unknown[]) => string;
+  };
+  const originalResolve = Module._resolveFilename;
+  const mpnextSrc = path.join(mpnextPath, "src");
+  Module._resolveFilename = function (request: string, ...rest: unknown[]) {
+    if (request === "server-only") return serverOnlyStub;
+    // MPNext's tsconfig alias "@/*" -> "./src/*". tsx only honours tsconfig
+    // paths for the project it was launched from, so map it here as well.
+    if (request.startsWith("@/")) {
+      request = path.join(mpnextSrc, request.slice(2));
+    }
+    return originalResolve.call(this, request, ...rest);
+  };
+}
 
 // --- Dynamically import MPHelper from MPNext's source ---
 const mphelperEntry = path.join(
